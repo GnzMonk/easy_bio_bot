@@ -8,7 +8,7 @@ from keyboards.keyboards import create_links_kb
 
 from aiogram.types import FSInputFile, InputMediaPhoto
 from keyboards.keyboards import LEXICON
-from database.language_db import users_lang
+from database.language_db import users_lang, users_clicks, adress_clicks
 from aiogram import Bot
 from aiogram.enums import ChatMemberStatus
 from services.services import get_text_with_promocode, get_land_code
@@ -18,6 +18,8 @@ user_router = Router()
 
 @user_router.message(CommandStart())
 async def process_start_command(message: Message):
+    if not message.from_user.id in users_clicks:
+        users_clicks[message.from_user.id] = 0
     if not message.from_user.id in users_lang:
         code = message.from_user.language_code
         if not (code in ("ru", "tg","ky", "uz")):
@@ -100,26 +102,17 @@ async def show_services(callback: CallbackQuery):
     )
     await callback.answer()
 
-
 @user_router.callback_query(F.data == "adress_click")
-async def show_adress(callback: CallbackQuery):
-    code = get_land_code(callback)
-
-    await callback.message.answer(
-        text=LEXICON[code]["adress"],
-        reply_markup=create_inline_kb(
-            gorchakovo_adress_click=LEXICON[code]["buttons"]["gorchakovo"],
-            adress_back_click=LEXICON[code]["buttons"]["back"])
-    )
-    await callback.answer()
-
+@user_router.callback_query(F.data == "back_to_adress")
 @user_router.callback_query(F.data == "gorchakovo_adress_back_click")
 async def show_adress(callback: CallbackQuery):
     code = get_land_code(callback)
+    users_clicks[callback.from_user.id] += 1
 
     await callback.message.answer(
         text=LEXICON[code]["adress"],
         reply_markup=create_inline_kb(
+            tushino_adress_click = LEXICON[code]["buttons"]["tushino"],
             gorchakovo_adress_click = LEXICON[code]["buttons"]["gorchakovo"],
             adress_back_click = LEXICON[code]["buttons"]["back"]
         )
@@ -170,6 +163,7 @@ async def show_any_service(callback: CallbackQuery):
 
 @user_router.callback_query(F.data == "gorchakovo_adress_click")
 async def show_gorchakovo_adress(callback: CallbackQuery):
+    adress_clicks[0] += 1
     code = get_land_code(callback)
     await callback.message.answer("Загружаем маршрут...")
     await callback.answer()
@@ -192,6 +186,38 @@ async def show_gorchakovo_adress(callback: CallbackQuery):
             },
             callback_buttons={
                 LEXICON[code]["buttons"]["back"]: "gorchakovo_adress_back_click"
+            }
+        ))
+
+# тушино
+@user_router.callback_query(F.data == "tushino_adress_click")
+async def show_gorchakovo_adress(callback: CallbackQuery):
+    code = get_land_code(callback)
+    adress_clicks[1] += 1
+
+    await callback.message.answer("Загружаем маршрут...")
+    await callback.answer()
+    photo1 = FSInputFile("images/tushino_1.jpg")
+    photo2 = FSInputFile("images/tushino_2.jpg")
+    photo3 = FSInputFile("images/tushino_3.jpg")
+    media = [
+        InputMediaPhoto(media=photo1, caption=LEXICON[code]["where_tushino"]),
+        InputMediaPhoto(media=photo2),
+        InputMediaPhoto(media=photo3)
+    ]
+    # Отправляем новое сообщение с фото
+    await callback.message.answer_media_group(
+        media=media
+        )
+    await callback.message.answer(
+        text=LEXICON[code]["see_on_map_tushino"],
+        reply_markup=create_links_kb(
+            url_buttons={
+                LEXICON[code]["buttons"]["maps_yandex"]: "https://yandex.ru/maps?whatshere%5Bpoint%5D=37.402657%2C55.837849&whatshere%5Bzoom%5D=19.664007&ll=37.402705280866456%2C55.837959740446095&z=19.664007&si=rp3nebh226x6fef0jq72pbg7zw",
+                LEXICON[code]["buttons"]["maps_google"]: "https://www.google.ru/maps/place/Тот+самый+Хмель/@55.8378666,37.4019809,19.05z/data=!4m6!3m5!1s0x46b5471126008ba3:0xa9c41a851d0f8822!8m2!3d55.8379238!4d37.40259!16s%2Fg%2F11r91v4wyq!5m1!1e1?entry=ttu&g_ep=EgoyMDI1MTExNy4wIKXMDSoASAFQAw%3D%3D"
+            },
+            callback_buttons={
+                LEXICON[code]["buttons"]["back"]: "back_to_adress"
             }
         ))
 
